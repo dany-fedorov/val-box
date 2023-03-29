@@ -3,9 +3,9 @@ export class ValBox<VT, MT> {
 
   alias: string;
   hasValue = false;
-  value: VT | null = null;
+  value: VT | undefined = undefined;
   hasMetadata = false;
-  metadata: MT | null = null;
+  metadata: MT | undefined = undefined;
 
   static new<VT, MT>(alias?: string): ValBox<VT, MT> {
     return new ValBox<VT, MT>(alias);
@@ -21,12 +21,12 @@ export class ValBox<VT, MT> {
     return this;
   }
 
-  getValue(): VT | null {
+  getValue(): VT | undefined {
     return this.value;
   }
 
   delValue(): this {
-    this.value = null;
+    this.value = undefined;
     this.hasValue = false;
     return this;
   }
@@ -37,12 +37,12 @@ export class ValBox<VT, MT> {
     return this;
   }
 
-  getMetadata(): MT | null {
+  getMetadata(): MT | undefined {
     return this.metadata;
   }
 
   delMetadata(): this {
-    this.metadata = null;
+    this.metadata = undefined;
     this.hasMetadata = false;
     return this;
   }
