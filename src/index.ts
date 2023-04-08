@@ -1,3 +1,9 @@
+export class ValBoxAssertionError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export class ValBox<VT, MT> {
   static ANONYMOUS_VAL_BOX_ALIAS = '<<Anonymous ValBox>>';
 
@@ -13,6 +19,15 @@ export class ValBox<VT, MT> {
 
   constructor(alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS) {
     this.alias = alias;
+  }
+
+  assertHasValue(): this {
+    if (!this.hasValue) {
+      throw new ValBoxAssertionError(
+        `ValBox#assertHasValue: ValBox "${this.alias}" has no value.`,
+      );
+    }
+    return this;
   }
 
   setValue(value: VT): this {
