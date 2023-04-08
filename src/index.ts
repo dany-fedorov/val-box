@@ -21,15 +21,26 @@ export class ValBox<VT, MT> {
     this.alias = alias;
   }
 
-  assertHasValue(): this & { value: VT; hasValue: true; getValue(): VT } {
+  assertHasValue(): ValBoxV<VT, MT> {
     if (!this.hasValue) {
       throw new ValBoxAssertionError(
         `ValBox#assertHasValue: ValBox "${this.alias}" has no value.`,
       );
     }
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    return this;
+    return this as ValBoxV<VT, MT>;
+  }
+
+  assertHasMetadata(): ValBoxM<VT, MT> {
+    if (!this.hasValue) {
+      throw new ValBoxAssertionError(
+        `ValBox#assertHasValue: ValBox "${this.alias}" has no metadata.`,
+      );
+    }
+    return this as ValBoxM<VT, MT>;
+  }
+
+  assertHasValueAndMetadata(): ValBoxVM<VT, MT> {
+    return this.assertHasValue().assertHasMetadata() as ValBoxVM<VT, MT>;
   }
 
   setValue(value: VT): this {
@@ -62,5 +73,63 @@ export class ValBox<VT, MT> {
     this.metadata = undefined;
     this.hasMetadata = false;
     return this;
+  }
+}
+
+export class ValBoxV<VT, MT> extends ValBox<VT, MT> {
+  override hasValue: true;
+  override value: VT;
+
+  constructor(alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS, value: VT) {
+    super(alias);
+    this.hasValue = true;
+    this.value = value;
+  }
+
+  override getValue(): VT {
+    return super.getValue() as VT;
+  }
+}
+
+export class ValBoxM<VT, MT> extends ValBox<VT, MT> {
+  override hasMetadata: true;
+  override metadata: MT;
+
+  constructor(alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS, metadata: MT) {
+    super(alias);
+    this.hasMetadata = true;
+    this.metadata = metadata;
+  }
+
+  override getMetadata(): MT {
+    return super.getMetadata() as MT;
+  }
+}
+
+export class ValBoxVM<VT, MT> extends ValBox<VT, MT> {
+  override hasValue: true;
+  override value: VT;
+
+  override hasMetadata: true;
+  override metadata: MT;
+
+  constructor(
+    alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS,
+    value: VT,
+    metadata: MT,
+  ) {
+    super(alias);
+    this.hasValue = true;
+    this.value = value;
+    this.hasMetadata = true;
+    this.metadata = metadata;
+  }
+
+  override getValue(): VT {
+    return super.getValue() as VT;
+  }
+
+  override getMetadata(): MT {
+    return super.getMetadata() as MT;
   }
 }
