@@ -21,12 +21,14 @@ export class ValBox<VT, MT> {
     this.alias = alias;
   }
 
-  assertHasValue(): this {
+  assertHasValue(): this & { value: VT; hasValue: true; getValue(): VT } {
     if (!this.hasValue) {
       throw new ValBoxAssertionError(
         `ValBox#assertHasValue: ValBox "${this.alias}" has no value.`,
       );
     }
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
     return this;
   }
 
