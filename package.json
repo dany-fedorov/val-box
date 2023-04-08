@@ -1,6 +1,6 @@
 {
   "name": "val-box",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Val Box.",
   "main": "./index.js",
   "scripts": {
