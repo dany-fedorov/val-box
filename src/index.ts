@@ -80,7 +80,9 @@ export class ValBoxV<VT, MT> extends ValBox<VT, MT> {
   override hasValue: true;
   override value: VT;
 
-  constructor(alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS, value: VT) {
+  static ANONYMOUS_VAL_V_BOX_ALIAS = '<<Anonymous ValBoxV>>';
+
+  constructor(alias: string = ValBoxV.ANONYMOUS_VAL_V_BOX_ALIAS, value: VT) {
     super(alias);
     this.hasValue = true;
     this.value = value;
@@ -95,7 +97,9 @@ export class ValBoxM<VT, MT> extends ValBox<VT, MT> {
   override hasMetadata: true;
   override metadata: MT;
 
-  constructor(alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS, metadata: MT) {
+  static ANONYMOUS_VAL_M_BOX_ALIAS = '<<Anonymous ValBoxM>>';
+
+  constructor(alias: string = ValBoxM.ANONYMOUS_VAL_M_BOX_ALIAS, metadata: MT) {
     super(alias);
     this.hasMetadata = true;
     this.metadata = metadata;
@@ -113,8 +117,10 @@ export class ValBoxVM<VT, MT> extends ValBox<VT, MT> {
   override hasMetadata: true;
   override metadata: MT;
 
+  static ANONYMOUS_VAL_BOX_VM_ALIAS = '<<Anonymous ValBoxVM>>';
+
   constructor(
-    alias: string = ValBox.ANONYMOUS_VAL_BOX_ALIAS,
+    alias: string = ValBoxVM.ANONYMOUS_VAL_BOX_VM_ALIAS,
     value: VT,
     metadata: MT,
   ) {
