@@ -409,8 +409,7 @@ export class ValBoxNoValueNoMetadata extends ValBoxUnknownValueUnknownMetadata<
 export class ValBoxWithValueNoMetadata<
   VT,
 > extends ValBoxUnknownValueUnknownMetadata<VT, never> {
-  static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.WithValue.NoMetadata>>';
+  static override ANONYMOUS_ALIAS = '<<Anonymous ValBox.WithValue.NoMetadata>>';
 
   override readonly _hasValue = true as const;
   override _value: VT;
@@ -473,18 +472,14 @@ export class ValBoxWithValueNoMetadata<
 export class ValBoxNoValueWithMetadata<
   MT,
 > extends ValBoxUnknownValueUnknownMetadata<never, MT> {
-  static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.NoValue.WithMetadata>>';
+  static override ANONYMOUS_ALIAS = '<<Anonymous ValBox.NoValue.WithMetadata>>';
 
   override readonly _hasValue = false as const;
   override readonly _value = undefined;
   override readonly _hasMetadata = true as const;
   override _metadata: MT;
 
-  constructor(
-    metadata: MT,
-    alias = ValBoxNoValueWithMetadata.ANONYMOUS_ALIAS,
-  ) {
+  constructor(metadata: MT, alias = ValBoxNoValueWithMetadata.ANONYMOUS_ALIAS) {
     super(alias);
     this._hasMetadata = true;
     this._metadata = metadata;
@@ -547,7 +542,7 @@ export namespace ValBox {
   > {}
 
   Object.defineProperty(UnknownValue, 'name', {
-    value: 'ValBoxUnknownValueUnknownMetadata',
+    value: 'ValBoxUnknownValueUnknownMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
@@ -572,7 +567,7 @@ export namespace ValBox {
   > extends ValBoxUnknownValueUnknownMetadata<VT, MT> {}
 
   Object.defineProperty(UnknownMetadata, 'name', {
-    value: 'ValBoxUnknownValueUnknownMetadata',
+    value: 'ValBoxUnknownValueUnknownMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
@@ -597,7 +592,7 @@ export namespace ValBox {
   > {}
 
   Object.defineProperty(WithValue, 'name', {
-    value: 'ValBoxWithValueUnknownMetadata',
+    value: 'ValBoxWithValueUnknownMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
@@ -622,7 +617,7 @@ export namespace ValBox {
   > {}
 
   Object.defineProperty(WithValue, 'name', {
-    value: 'ValBoxUnknownValueWithMetadata',
+    value: 'ValBoxUnknownValueWithMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
@@ -638,7 +633,7 @@ export namespace ValBox {
   export class NoValue<MT> extends ValBoxNoValueUnknownMetadata<MT> {}
 
   Object.defineProperty(NoValue, 'name', {
-    value: 'ValBoxNoValueUnknownMetadata',
+    value: 'ValBoxNoValueUnknownMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
@@ -657,7 +652,7 @@ export namespace ValBox {
   export class NoMetadata<MT> extends ValBoxUnknownValueNoMetadata<MT> {}
 
   Object.defineProperty(NoMetadata, 'name', {
-    value: 'ValBoxUnknownValueNoMetadata',
+    value: 'ValBoxUnknownValueNoMetadata:alias',
     writable: false,
     enumerable: false,
     configurable: true,
