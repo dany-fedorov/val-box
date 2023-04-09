@@ -31,26 +31,26 @@ export class ValBoxUnknownValueUnknownMetadata<VT, MT> {
     this.alias = alias;
   }
 
-  assertHasValue(): ValBoxKnownValueUnknownMetadata<VT, MT> {
+  assertHasValue(): ValBoxWithValueUnknownMetadata<VT, MT> {
     if (!this._hasValue) {
       throw new ValBoxAssertionError(
         `${this.constructor.name}#assertHasValue: "${this.alias}" has no value.`,
       );
     }
-    return this as unknown as ValBoxKnownValueUnknownMetadata<VT, MT>;
+    return this as unknown as ValBoxWithValueUnknownMetadata<VT, MT>;
   }
 
-  assertHasMetadata(): ValBoxUnknownValueKnownMetadata<VT, MT> {
+  assertHasMetadata(): ValBoxUnknownValueWithMetadata<VT, MT> {
     if (!this._hasValue) {
       throw new ValBoxAssertionError(
         `${this.constructor.name}#assertHasMetadata: "${this.alias}" has no metadata.`,
       );
     }
-    return this as unknown as ValBoxUnknownValueKnownMetadata<VT, MT>;
+    return this as unknown as ValBoxUnknownValueWithMetadata<VT, MT>;
   }
 
-  assertHasValueAndMetadata(): ValBoxKnownValueKnownMetadata<VT, MT> {
-    return this.assertHasValue().assertHasMetadata() as unknown as ValBoxKnownValueKnownMetadata<
+  assertHasValueAndMetadata(): ValBoxWithValueWithMetadata<VT, MT> {
+    return this.assertHasValue().assertHasMetadata() as unknown as ValBoxWithValueWithMetadata<
       VT,
       MT
     >;
@@ -97,19 +97,19 @@ export class ValBoxUnknownValueUnknownMetadata<VT, MT> {
   }
 }
 
-export class ValBoxKnownValueUnknownMetadata<
+export class ValBoxWithValueUnknownMetadata<
   VT,
   MT,
 > extends ValBoxUnknownValueUnknownMetadata<VT, MT> {
   static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.KnownValue.UnknownMetadata>>';
+    '<<Anonymous ValBox.WithValue.UnknownMetadata>>';
 
   override readonly _hasValue: true;
   override _value: VT;
 
   constructor(
     value: VT,
-    alias: string = ValBoxKnownValueUnknownMetadata.ANONYMOUS_ALIAS,
+    alias: string = ValBoxWithValueUnknownMetadata.ANONYMOUS_ALIAS,
   ) {
     super(alias);
     this._hasValue = true;
@@ -132,27 +132,27 @@ export class ValBoxKnownValueUnknownMetadata<
     return super.assertHasValue() as this;
   }
 
-  override assertHasMetadata(): ValBoxKnownValueKnownMetadata<VT, MT> {
-    return super.assertHasMetadata() as unknown as ValBoxKnownValueKnownMetadata<
+  override assertHasMetadata(): ValBoxWithValueWithMetadata<VT, MT> {
+    return super.assertHasMetadata() as unknown as ValBoxWithValueWithMetadata<
       VT,
       MT
     >;
   }
 }
 
-export class ValBoxUnknownValueKnownMetadata<
+export class ValBoxUnknownValueWithMetadata<
   VT,
   MT,
 > extends ValBoxUnknownValueUnknownMetadata<VT, MT> {
   static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.UnknownValue.KnownMetadata>>';
+    '<<Anonymous ValBox.UnknownValue.WithMetadata>>';
 
   override readonly _hasMetadata: true;
   override _metadata: MT;
 
   constructor(
     metadata: MT,
-    alias: string = ValBoxUnknownValueKnownMetadata.ANONYMOUS_ALIAS,
+    alias: string = ValBoxUnknownValueWithMetadata.ANONYMOUS_ALIAS,
   ) {
     super(alias);
     this._hasMetadata = true;
@@ -171,8 +171,8 @@ export class ValBoxUnknownValueKnownMetadata<
     throw new ValBoxMethodNotAllowedError(this.constructor.name, 'delMetadata');
   }
 
-  override assertHasValue(): ValBoxKnownValueKnownMetadata<VT, MT> {
-    return super.assertHasValue() as unknown as ValBoxKnownValueKnownMetadata<
+  override assertHasValue(): ValBoxWithValueWithMetadata<VT, MT> {
+    return super.assertHasValue() as unknown as ValBoxWithValueWithMetadata<
       VT,
       MT
     >;
@@ -183,12 +183,12 @@ export class ValBoxUnknownValueKnownMetadata<
   }
 }
 
-export class ValBoxKnownValueKnownMetadata<
+export class ValBoxWithValueWithMetadata<
   VT,
   MT,
 > extends ValBoxUnknownValueUnknownMetadata<VT, MT> {
   static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.KnownValue.KnownMetadata>>';
+    '<<Anonymous ValBox.WithValue.WithMetadata>>';
 
   override readonly _hasValue: true;
   override _value: VT;
@@ -199,7 +199,7 @@ export class ValBoxKnownValueKnownMetadata<
   constructor(
     value: VT,
     metadata: MT,
-    alias: string = ValBoxKnownValueKnownMetadata.ANONYMOUS_ALIAS,
+    alias: string = ValBoxWithValueWithMetadata.ANONYMOUS_ALIAS,
   ) {
     super(alias);
     this._hasValue = true;
@@ -280,8 +280,8 @@ export class ValBoxNoValueUnknownMetadata<
     );
   }
 
-  override assertHasMetadata(): ValBoxNoValueKnownMetadata<MT> {
-    return super.assertHasMetadata() as unknown as ValBoxNoValueKnownMetadata<MT>;
+  override assertHasMetadata(): ValBoxNoValueWithMetadata<MT> {
+    return super.assertHasMetadata() as unknown as ValBoxNoValueWithMetadata<MT>;
   }
 
   override assertHasValueAndMetadata(): never {
@@ -320,8 +320,8 @@ export class ValBoxUnknownValueNoMetadata<
     throw new ValBoxMethodNotAllowedError(this.constructor.name, 'setMetadata');
   }
 
-  override assertHasValue(): ValBoxKnownValueNoMetadata<VT> {
-    return super.assertHasValue() as unknown as ValBoxKnownValueNoMetadata<VT>;
+  override assertHasValue(): ValBoxWithValueNoMetadata<VT> {
+    return super.assertHasValue() as unknown as ValBoxWithValueNoMetadata<VT>;
   }
 
   override assertHasMetadata(): never {
@@ -406,11 +406,11 @@ export class ValBoxNoValueNoMetadata extends ValBoxUnknownValueUnknownMetadata<
   }
 }
 
-export class ValBoxKnownValueNoMetadata<
+export class ValBoxWithValueNoMetadata<
   VT,
 > extends ValBoxUnknownValueUnknownMetadata<VT, never> {
   static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.KnownValue.NoMetadata>>';
+    '<<Anonymous ValBox.WithValue.NoMetadata>>';
 
   override readonly _hasValue = true as const;
   override _value: VT;
@@ -418,7 +418,7 @@ export class ValBoxKnownValueNoMetadata<
   override readonly _hasMetadata = false as const;
   override readonly _metadata = undefined;
 
-  constructor(value: VT, alias = ValBoxKnownValueNoMetadata.ANONYMOUS_ALIAS) {
+  constructor(value: VT, alias = ValBoxWithValueNoMetadata.ANONYMOUS_ALIAS) {
     super(alias);
     this._hasValue = true;
     this._value = value;
@@ -470,11 +470,11 @@ export class ValBoxKnownValueNoMetadata<
   }
 }
 
-export class ValBoxNoValueKnownMetadata<
+export class ValBoxNoValueWithMetadata<
   MT,
 > extends ValBoxUnknownValueUnknownMetadata<never, MT> {
   static override ANONYMOUS_ALIAS =
-    '<<Anonymous ValBox.NoValue.KnownMetadata>>';
+    '<<Anonymous ValBox.NoValue.WithMetadata>>';
 
   override readonly _hasValue = false as const;
   override readonly _value = undefined;
@@ -483,7 +483,7 @@ export class ValBoxNoValueKnownMetadata<
 
   constructor(
     metadata: MT,
-    alias = ValBoxNoValueKnownMetadata.ANONYMOUS_ALIAS,
+    alias = ValBoxNoValueWithMetadata.ANONYMOUS_ALIAS,
   ) {
     super(alias);
     this._hasMetadata = true;
@@ -539,7 +539,7 @@ export class ValBoxNoValueKnownMetadata<
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace ValBox {
   export const Unknown = ValBoxUnknownValueUnknownMetadata;
-  export const Known = ValBoxKnownValueKnownMetadata;
+  export type Unknown<VT, MT> = ValBoxUnknownValueUnknownMetadata<VT, MT>;
 
   export class UnknownValue<VT, MT> extends ValBoxUnknownValueUnknownMetadata<
     VT,
@@ -556,8 +556,14 @@ export namespace ValBox {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace UnknownValue {
     export const UnknownMetadata = ValBoxUnknownValueUnknownMetadata;
+    export type UnknownMetadata<VT, MT> = ValBoxUnknownValueUnknownMetadata<
+      VT,
+      MT
+    >;
     export const NoMetadata = ValBoxUnknownValueNoMetadata;
-    export const KnownMetadata = ValBoxUnknownValueKnownMetadata;
+    export type NoMetadata<VT> = ValBoxUnknownValueNoMetadata<VT>;
+    export const WithMetadata = ValBoxUnknownValueWithMetadata;
+    export type WithMetadata<VT, MT> = ValBoxUnknownValueWithMetadata<VT, MT>;
   }
 
   export class UnknownMetadata<
@@ -575,56 +581,61 @@ export namespace ValBox {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace UnknownMetadata {
     export const UnknownValue = ValBoxUnknownValueUnknownMetadata;
+    export type UnknownValue<VT, MT> = ValBoxUnknownValueUnknownMetadata<
+      VT,
+      MT
+    >;
     export const NoValue = ValBoxNoValueUnknownMetadata;
-    export const KnownValue = ValBoxKnownValueUnknownMetadata;
+    export type NoValue<MT> = ValBoxNoValueUnknownMetadata<MT>;
+    export const WithValue = ValBoxWithValueUnknownMetadata;
+    export type WithValue<VT, MT> = ValBoxWithValueUnknownMetadata<VT, MT>;
   }
 
-  export class KnownValue<VT, MT> extends ValBoxKnownValueUnknownMetadata<
+  export class WithValue<VT, MT> extends ValBoxWithValueUnknownMetadata<
     VT,
     MT
   > {}
 
-  Object.defineProperty(KnownValue, 'name', {
-    value: 'ValBoxKnownValueUnknownMetadata',
+  Object.defineProperty(WithValue, 'name', {
+    value: 'ValBoxWithValueUnknownMetadata',
     writable: false,
     enumerable: false,
     configurable: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-namespace
-  export namespace KnownValue {
-    export const UnknownMetadata = ValBoxKnownValueUnknownMetadata;
-    export const NoMetadata = ValBoxKnownValueNoMetadata;
-    export const KnownMetadata = ValBoxKnownValueKnownMetadata;
+  export namespace WithValue {
+    export const UnknownMetadata = ValBoxWithValueUnknownMetadata;
+    export type UnknownMetadata<VT, MT> = ValBoxWithValueUnknownMetadata<
+      VT,
+      MT
+    >;
+    export const NoMetadata = ValBoxWithValueNoMetadata;
+    export type NoMetadata<VT> = ValBoxWithValueNoMetadata<VT>;
+    export const WithMetadata = ValBoxWithValueWithMetadata;
+    export type WithMetadata<VT, MT> = ValBoxWithValueWithMetadata<VT, MT>;
   }
 
-  export class KnownMetadata<VT, MT> extends ValBoxUnknownValueKnownMetadata<
+  export class WithMetadata<VT, MT> extends ValBoxUnknownValueWithMetadata<
     VT,
     MT
   > {}
 
-  Object.defineProperty(KnownValue, 'name', {
-    value: 'ValBoxUnknownValueKnownMetadata',
+  Object.defineProperty(WithValue, 'name', {
+    value: 'ValBoxUnknownValueWithMetadata',
     writable: false,
     enumerable: false,
     configurable: true,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-namespace
-  export namespace KnownMetadata {
-    export const UnknownValue = ValBoxUnknownValueKnownMetadata;
-    export const NoValue = ValBoxNoValueKnownMetadata;
-    export const KnownValue = ValBoxKnownValueKnownMetadata;
+  export namespace WithMetadata {
+    export const UnknownValue = ValBoxUnknownValueWithMetadata;
+    export const NoValue = ValBoxNoValueWithMetadata;
+    export const WithValue = ValBoxWithValueWithMetadata;
   }
 
   export class NoValue<MT> extends ValBoxNoValueUnknownMetadata<MT> {}
-
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  export namespace NoValue {
-    export const UnknownMetadata = ValBoxNoValueUnknownMetadata;
-    export const NoMetadata = ValBoxNoValueNoMetadata;
-    export const KnownMetadata = ValBoxNoValueKnownMetadata;
-  }
 
   Object.defineProperty(NoValue, 'name', {
     value: 'ValBoxNoValueUnknownMetadata',
@@ -632,6 +643,16 @@ export namespace ValBox {
     enumerable: false,
     configurable: true,
   });
+
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  export namespace NoValue {
+    export const UnknownMetadata = ValBoxNoValueUnknownMetadata;
+    export type UnknownMetadata<MT> = ValBoxNoValueUnknownMetadata<MT>;
+    export const NoMetadata = ValBoxNoValueNoMetadata;
+    export type NoMetadata = ValBoxNoValueNoMetadata;
+    export const WithMetadata = ValBoxNoValueWithMetadata;
+    export type WithMetadata<MT> = ValBoxNoValueWithMetadata<MT>;
+  }
 
   export class NoMetadata<MT> extends ValBoxUnknownValueNoMetadata<MT> {}
 
@@ -645,7 +666,10 @@ export namespace ValBox {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace NoMetadata {
     export const UnknownValue = ValBoxUnknownValueNoMetadata;
+    export type UnknownValue<VT> = ValBoxUnknownValueNoMetadata<VT>;
     export const NoValue = ValBoxNoValueNoMetadata;
-    export const KnownValue = ValBoxKnownValueNoMetadata;
+    export type NoValue = ValBoxNoValueNoMetadata;
+    export const WithValue = ValBoxWithValueNoMetadata;
+    export type WithValue<VT> = ValBoxWithValueNoMetadata<VT>;
   }
 }
