@@ -16,7 +16,11 @@ export class ValBoxMethodNotAllowedError extends ValBoxError {
   }
 }
 
+const VAL_BOX_TYPE_SYMBOL = Symbol('VAL_BOX_TYPE_SYMBOL');
+
 export class ValBoxUnknownValueUnknownMetadata<VT, MT> {
+  [VAL_BOX_TYPE_SYMBOL] = true as const;
+
   static ANONYMOUS_ALIAS = '<<Anonymous ValBox.UnknownValue.UnknownMetadata>>';
 
   alias: string;
@@ -533,6 +537,15 @@ export class ValBoxNoValueWithMetadata<
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace ValBox {
+  export function isValBox(
+    obj: unknown,
+  ): obj is ValBoxUnknownValueUnknownMetadata<unknown, unknown> {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      return false;
+    }
+    return (obj as any)[VAL_BOX_TYPE_SYMBOL] === true;
+  }
+
   export const Unknown = ValBoxUnknownValueUnknownMetadata;
   export type Unknown<VT, MT> = ValBoxUnknownValueUnknownMetadata<VT, MT>;
 
