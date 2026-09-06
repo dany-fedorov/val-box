@@ -1,3 +1,8 @@
+import { createValBoxSnapshot } from './snapshot';
+
+export type { Presence, ValBoxSnapshot } from './snapshot';
+import type { ValBoxSnapshot } from './snapshot';
+
 class ValBoxError extends Error {
   constructor(message: string) {
     super(message);
@@ -100,7 +105,7 @@ export class ValBoxUnknownValueUnknownMetadata<TValue, TMetadata> {
   }
 
   assertHasMetadata(): this {
-    if (!this.hasValue()) {
+    if (!this.hasMetadata()) {
       throw ValBoxAssertionError.plines(
         `${this.constructor.name}#assertHasMetadata`,
         `Reason - DOESN'T HAVE metadata.`,
@@ -111,7 +116,7 @@ export class ValBoxUnknownValueUnknownMetadata<TValue, TMetadata> {
   }
 
   assertHasNoMetadata(): this {
-    if (this.hasValue()) {
+    if (this.hasMetadata()) {
       throw ValBoxAssertionError.plines(
         `${this.constructor.name}#assertHasNoMetadata`,
         `Reason - HAS metadata.`,
@@ -142,78 +147,122 @@ export class ValBoxUnknownValueUnknownMetadata<TValue, TMetadata> {
         `Alias - ${this.alias}`,
         `Input - ${JSON.stringify(refinement)}`,
       );
-    let newBox: any;
     if (hasValue === undefined) {
       if (hasMetadata === undefined) {
-        newBox = new ValBoxUnknownValueUnknownMetadata(
+        const newBox = new ValBoxUnknownValueUnknownMetadata<TValue, TMetadata>(
           this.getIntentionalAlias(),
         );
         if (this.hasValue()) {
-          newBox.setValue(this.getValue());
+          newBox.setValue(this.getValue() as TValue);
         }
         if (this.hasMetadata()) {
-          newBox.setMetadata(this.getMetadata());
+          newBox.setMetadata(this.getMetadata() as TMetadata);
         }
+        return newBox as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else if (hasMetadata === true) {
-        newBox = new ValBoxUnknownValueWithMetadata(
-          this.getMetadata(),
+        const newBox = new ValBoxUnknownValueWithMetadata<TValue, TMetadata>(
+          this.getMetadata() as TMetadata,
           this.getIntentionalAlias(),
         );
         if (this.hasValue()) {
-          newBox.setValue(this.getValue());
+          newBox.setValue(this.getValue() as TValue);
         }
+        return newBox as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else if (hasMetadata === false) {
-        newBox = new ValBoxUnknownValueNoMetadata(this.getIntentionalAlias());
+        const newBox = new ValBoxUnknownValueNoMetadata<TValue>(
+          this.getIntentionalAlias(),
+        );
         if (this.hasValue()) {
-          newBox.setValue(this.getValue());
+          newBox.setValue(this.getValue() as TValue);
         }
+        return newBox as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else {
         throw BadInputError();
       }
     } else if (hasValue === true) {
       if (hasMetadata === undefined) {
-        newBox = new ValBoxWithValueUnknownMetadata(this.getIntentionalAlias());
+        const newBox = new ValBoxWithValueUnknownMetadata<TValue, TMetadata>(
+          this.getValue() as TValue,
+          this.getIntentionalAlias(),
+        );
         if (this.hasMetadata()) {
-          newBox.setMetadata(this.getMetadata());
+          newBox.setMetadata(this.getMetadata() as TMetadata);
         }
+        return newBox as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else if (hasMetadata === true) {
-        newBox = new ValBoxWithValueWithMetadata(
-          this.getValue(),
-          this.getMetadata(),
+        return new ValBoxWithValueWithMetadata<TValue, TMetadata>(
+          this.getValue() as TValue,
+          this.getMetadata() as TMetadata,
           this.getIntentionalAlias(),
-        );
+        ) as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else if (hasMetadata === false) {
-        newBox = new ValBoxWithValueNoMetadata(
-          this.getValue(),
+        return new ValBoxWithValueNoMetadata<TValue>(
+          this.getValue() as TValue,
           this.getIntentionalAlias(),
-        );
+        ) as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else {
         throw BadInputError();
       }
     } else if (hasValue === false) {
       if (hasMetadata === undefined) {
-        newBox = new ValBoxNoValueUnknownMetadata(this.getIntentionalAlias());
-        if (this.hasMetadata()) {
-          newBox.setMetadata(this.getMetadata());
-        }
-      } else if (hasMetadata === true) {
-        newBox = new ValBoxNoValueWithMetadata(
-          this.getMetadata(),
+        const newBox = new ValBoxNoValueUnknownMetadata<TMetadata>(
           this.getIntentionalAlias(),
         );
+        if (this.hasMetadata()) {
+          newBox.setMetadata(this.getMetadata() as TMetadata);
+        }
+        return newBox as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
+      } else if (hasMetadata === true) {
+        return new ValBoxNoValueWithMetadata<TMetadata>(
+          this.getMetadata() as TMetadata,
+          this.getIntentionalAlias(),
+        ) as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else if (hasMetadata === false) {
-        newBox = new ValBoxNoValueNoMetadata(this.getIntentionalAlias());
+        return new ValBoxNoValueNoMetadata(
+          this.getIntentionalAlias(),
+        ) as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
+          TConversion,
+          TValue,
+          TMetadata
+        >;
       } else {
         throw BadInputError();
       }
     } else {
       throw BadInputError();
     }
-    return newBox as unknown as ValBoxUnknownValueUnknownMetadata.ConvertedResult<
-      TConversion,
-      TValue,
-      TMetadata
-    >;
   }
 
   setValue(_value: TValue): this {
@@ -255,6 +304,10 @@ export class ValBoxUnknownValueUnknownMetadata<TValue, TMetadata> {
     this._hasMetadata = false;
     return this;
   }
+
+  snapshot(): ValBoxSnapshot<TValue, TMetadata> {
+    return createValBoxSnapshot(this);
+  }
 }
 
 export namespace ValBoxUnknownValueUnknownMetadata {
@@ -263,67 +316,45 @@ export namespace ValBoxUnknownValueUnknownMetadata {
     hasMetadata?: boolean | undefined;
   };
 
+  type ConversionFlag<
+    TRefinement extends Conversion,
+    TKey extends keyof Conversion,
+  > = TKey extends keyof TRefinement ? TRefinement[TKey] : undefined;
+
+  type ConvertedAxes<
+    TValueFlag extends boolean | undefined,
+    TMetadataFlag extends boolean | undefined,
+    TValue,
+    TMetadata,
+  > = TValueFlag extends true
+    ? TMetadataFlag extends true
+      ? ValBoxWithValueWithMetadata<TValue, TMetadata>
+      : TMetadataFlag extends false
+        ? ValBoxWithValueNoMetadata<TValue>
+        : ValBoxWithValueUnknownMetadata<TValue, TMetadata>
+    : TValueFlag extends false
+      ? TMetadataFlag extends true
+        ? ValBoxNoValueWithMetadata<TMetadata>
+        : TMetadataFlag extends false
+          ? ValBoxNoValueNoMetadata
+          : ValBoxNoValueUnknownMetadata<TMetadata>
+      : TMetadataFlag extends true
+        ? ValBoxUnknownValueWithMetadata<TValue, TMetadata>
+        : TMetadataFlag extends false
+          ? ValBoxUnknownValueNoMetadata<TValue>
+          : ValBoxUnknownValueUnknownMetadata<TValue, TMetadata>;
+
   export type ConvertedResult<
     TRefinement extends Conversion,
     TValue,
     TMetadata,
-  > = TRefinement extends
-    | {
-        hasValue: undefined;
-        hasMetadata: undefined;
-      }
-    | { hasValue: undefined }
-    | { hasMetadata: undefined }
-    | Record<string, never>
-    ? ValBoxUnknownValueUnknownMetadata<TValue, TMetadata>
-    : TRefinement extends
-        | {
-            hasValue: undefined;
-            hasMetadata: true;
-          }
-        | { hasMetadata: true }
-    ? ValBoxUnknownValueWithMetadata<TValue, TMetadata>
-    : TRefinement extends
-        | {
-            hasValue: undefined;
-            hasMetadata: false;
-          }
-        | { hasMetadata: false }
-    ? ValBoxUnknownValueNoMetadata<TValue>
-    : TRefinement extends
-        | {
-            hasValue: true;
-            hasMetadata: undefined;
-          }
-        | { hasValue: true }
-    ? ValBoxWithValueUnknownMetadata<TValue, TMetadata>
-    : TRefinement extends {
-        hasValue: true;
-        hasMetadata: true;
-      }
-    ? ValBoxWithValueWithMetadata<TValue, TMetadata>
-    : TRefinement extends {
-        hasValue: true;
-        hasMetadata: false;
-      }
-    ? ValBoxWithValueNoMetadata<TValue>
-    : TRefinement extends
-        | {
-            hasValue: false;
-            hasMetadata: undefined;
-          }
-        | { hasValue: false }
-    ? ValBoxNoValueUnknownMetadata<TMetadata>
-    : TRefinement extends {
-        hasValue: false;
-        hasMetadata: true;
-      }
-    ? ValBoxNoValueWithMetadata<TMetadata>
-    : TRefinement extends {
-        hasValue: false;
-        hasMetadata: false;
-      }
-    ? ValBoxNoValueNoMetadata
+  > = TRefinement extends Conversion
+    ? ConvertedAxes<
+        ConversionFlag<TRefinement, 'hasValue'>,
+        ConversionFlag<TRefinement, 'hasMetadata'>,
+        TValue,
+        TMetadata
+      >
     : never;
 }
 
@@ -771,6 +802,12 @@ export class ValBoxNoValueWithMetadata<
 }
 
 export namespace ValBox {
+  export function snapshot<TValue, TMetadata>(
+    box: ValBoxUnknownValueUnknownMetadata<TValue, TMetadata>,
+  ): ValBoxSnapshot<TValue, TMetadata> {
+    return createValBoxSnapshot(box);
+  }
+
   export function isValBox(
     obj: unknown,
   ): obj is ValBoxUnknownValueUnknownMetadata<unknown, unknown> {
@@ -782,7 +819,7 @@ export namespace ValBox {
     ) {
       return false;
     }
-    return (obj as any)[VAL_BOX_TYPE_SYMBOL] === true;
+    return obj[VAL_BOX_TYPE_SYMBOL] === true;
   }
 
   export const Error = ValBoxError;
@@ -883,7 +920,7 @@ export namespace ValBox {
     TMetadata,
   > extends ValBoxUnknownValueWithMetadata<TValue, TMetadata> {}
 
-  Object.defineProperty(WithValue, 'name', {
+  Object.defineProperty(WithMetadata, 'name', {
     value: 'ValBoxUnknownValueWithMetadata:alias',
     writable: false,
     enumerable: false,
@@ -937,4 +974,3 @@ export namespace ValBox {
     export type WithValue<TValue> = ValBoxWithValueNoMetadata<TValue>;
   }
 }
-
