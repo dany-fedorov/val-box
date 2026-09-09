@@ -98,173 +98,141 @@ if (snapshot.value.present) {
 
 ## Why val-box exists
 
-### The problem
+**The useful pattern is a presence-aware value with acquisition provenance.**
+A configuration reader can return a value plus the source that supplied it, or
+no value plus an explanation. A consumer can receive the plain value while DI
+Bag retains its provenance for inspection. That is a real use case; it does
+not require every service to be boxed.
 
-`undefined` is a legitimate value, so it cannot also mean "nothing here".
-JavaScript draws the line at the language level: `"x" in obj` is
-[not the same as `obj.x !== undefined`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/in),
-and `Object.hasOwn` returns `true`
-[even when the value is `undefined`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn).
-TypeScript 4.4 added
-[`exactOptionalPropertyTypes`](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-4.html)
-to draw the same line for properties. Wire formats agree. In
-[JSON Merge Patch](https://www.rfc-editor.org/rfc/rfc7396.txt) an omitted
-member is left alone while `null` removes it. Protocol Buffers restored
-[explicit field presence](https://protobuf.dev/programming-guides/field_presence/)
-to proto3 because whether a field has a value is a different question from
-what the value is. The
-[GraphQL specification](https://github.com/graphql/graphql-spec/blob/main/spec/Section%203%20--%20Type%20System.md)
-says "there is a semantic difference between the explicitly provided value
-{null} versus having not provided a value".
+Two separate questions are preserved: “Was a value supplied?” and “Is anything
+known about this result?” Present `undefined`, `null`, `false`, and `0` are all
+values. An absent value can still have metadata, and a present value can have
+no metadata. The alias labels the result; it is not a DI registration key.
 
-Dependency injection hits this bug directly. NestJS classified a provider by
-`!isUndefined(provider.useValue)` until
-[commit 4cddcfb](https://github.com/nestjs/nest/commit/4cddcfb492ed55c6d90b6af25258d89e3075cfc6)
-switched to `hasOwnProperty.call(provider, 'useValue')`, fixing a
-"false-negative value provider not registered error when the value of the
-provider is `undefined`" reported in
-[#2732](https://github.com/nestjs/nest/issues/2732) and
-[#4743](https://github.com/nestjs/nest/issues/4743). Angular's injector tests
-`USE_VALUE in value` in
-[`provider_collection.ts`](https://github.com/angular/angular/blob/main/packages/core/src/di/provider_collection.ts),
-and [PR #27035](https://github.com/angular/angular/pull/27035) fixed a crash
-where a default parameter swallowed `useValue: undefined`.
+### Production precedents
 
-Metadata has a parallel problem. A port number, a connection string, a frozen
-configuration object, or a third-party client instance cannot carry a "where
-did this come from" annotation on itself. The annotation needs its own
-channel, present or absent independently of the value. Spring Boot wraps
-configuration values in
-[`OriginTrackedValue`](https://docs.spring.io/spring-boot/api/java/org/springframework/boot/origin/OriginTrackedValue.html),
-whose `getOrigin()` returns `null` "if the origin is not known".
-[OpenFeature](https://openfeature.dev/specification/types) resolves a flag to
-a `value` plus optional `variant`, `reason`, and `flag metadata`, and on
-failure "error code, reason, and error message will be set" next to the
-default value.
-[AWS Secrets Manager](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html)
-returns `SecretString` with `VersionId`, `VersionStages`, and `CreatedDate`.
+These sources establish the underlying patterns, not adoption of `val-box` or
+the necessity of its class hierarchy. Sources were checked on 2026-09-10.
 
-`val-box` gives the value and the metadata their own presence flags, keeps an
-optional alias for diagnostics, and exposes a frozen `snapshot()` that other
-libraries consume without depending on this package.
-
-### What it buys
-
-- **Present `undefined` is distinct from absent.** `Presence<T>` is a
-  discriminated union, so a consumer must check `present` before reading
-  `value`, and `{ present: true, value: undefined }` survives a boundary.
-  `Option` in [Effect](https://effect.website/docs/data-types/option/) and
-  [fp-ts](https://gcanti.github.io/fp-ts/modules/Option.ts.html) folds
-  `undefined` into `None` through `fromNullable`, and Java's
-  [`Optional.of(null)`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Optional.html)
-  throws, so those types cannot represent this case.
-- **Absence can carry an explanation.** A box with no value and present
-  metadata says why nothing was produced: a disabled flag, a missing
-  configuration key, an upstream error code. This is the OpenFeature shape
-  for a failed evaluation.
-- **Acquisition-time provenance on values you do not own.** The metadata
-  channel records which source answered, which secret version was read, or
-  which team owns the resource, without mutating a primitive or a client
-  object. Spring's actuator `env` endpoint and .NET's
-  [`GetDebugView`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.configuration.configurationrootextensions.getdebugview)
-  ("showing where each value came from") are the same idea for
-  configuration.
-- **A safe diagnostics boundary.** `snapshot()` returns frozen presence
-  records and the alias. Later mutation of the box cannot rewrite a
-  snapshot, and inspection tooling cannot mutate the service through it.
-  Payloads are shared by identity, never cloned or owned.
-
-### Where it fits in production
-
-1. **Configuration and secrets with provenance.** Consumers receive the raw
-   value. Startup diagnostics read the metadata to report that the database
-   URL came from the environment and which secret version the pool uses.
-2. **Optional or feature-gated services.** A registered factory that
-   legitimately produces nothing returns `{ present: false }` with a reason
-   in metadata, and its consumer receives `Presence<T>` instead of an
-   ambiguous `undefined`.
-3. **Cache and fetch results with freshness.** The value is the payload. The
-   metadata holds `etag`, `fetchedAt`, and `ttl` for observers that decide
-   when to refresh.
-4. **Ownership and audit tags.** `{ owner: 'platform', tier: 'critical' }` is
-   visible to inspection without resolving the service.
-
-### Prior art
-
-| Pattern | What it establishes |
+| Example | Relevant pattern and difference |
 | --- | --- |
-| [TypeScript `exactOptionalPropertyTypes`](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-4.html), [`in`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/in), [`Object.hasOwn`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn) | Presence is separate from the value at the language level. |
-| [RFC 7396 JSON Merge Patch](https://www.rfc-editor.org/rfc/rfc7396.txt), [Protobuf field presence](https://protobuf.dev/programming-guides/field_presence/), [GraphQL input coercion](https://github.com/graphql/graphql-spec/blob/main/spec/Section%203%20--%20Type%20System.md) | Absent and explicitly empty mean different things on the wire. |
-| [`JsonNullable<T>`](https://github.com/OpenAPITools/jackson-databind-nullable), [serde `Option<Option<T>>`](https://github.com/serde-rs/serde/issues/984), [Prisma `null` vs `undefined`](https://www.prisma.io/docs/orm/v7/prisma-client/special-fields-and-types/null-and-undefined) | Three-state wrappers appear wherever PATCH semantics matter. |
-| [NestJS commit 4cddcfb](https://github.com/nestjs/nest/commit/4cddcfb492ed55c6d90b6af25258d89e3075cfc6), [Angular `USE_VALUE in value`](https://github.com/angular/angular/blob/main/packages/core/src/di/provider_collection.ts), [Angular PR #27035](https://github.com/angular/angular/pull/27035) | DI containers have shipped and fixed present-`undefined` bugs. |
-| [Spring Boot `OriginTrackedValue`](https://docs.spring.io/spring-boot/api/java/org/springframework/boot/origin/OriginTrackedValue.html), [.NET `GetDebugView`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.configuration.configurationrootextensions.getdebugview) | A value with an independently optional origin, exposed for diagnostics. |
-| [OpenFeature resolution details](https://openfeature.dev/specification/types), [AWS `GetSecretValue`](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html) | Values delivered together with variant, reason, version, and timestamps. |
-| [PEP 593 `Annotated`](https://peps.python.org/pep-0593/), [W3C Baggage properties](https://www.w3.org/TR/baggage/), [JSON:API `meta`](https://jsonapi.org/format/) | Metadata attached beside a value, ignorable by consumers that do not understand it. |
+| [Spring Boot `OriginTrackedValue`](https://docs.spring.io/spring-boot/api/java/org/springframework/boot/origin/OriginTrackedValue.html) | A configuration value with an independently optional origin. This is the closest precedent for provenance beside a value, without modifying the value itself. |
+| [Protobuf explicit field presence](https://protobuf.dev/programming-guides/field_presence/) | The API tracks whether a field was set separately from its default value. This supports the presence distinction; it does not imply a JavaScript box or metadata channel is needed. |
+| [NestJS's `undefined` provider issue](https://github.com/nestjs/nest/issues/2732) and [provider classification](https://github.com/nestjs/nest/blob/master/packages/core/injector/module.ts) | A reported failure involved explicitly supplied `undefined`; current classification checks whether `useValue` is an own property. Presence confusion has caused real DI bugs; a property check was sufficient for Nest's case. |
+| [OpenFeature evaluation details](https://openfeature.dev/specification/types/) | Flag values travel with reasons, variants, and metadata. Its value is required and errors can yield a default, so it supports the metadata pattern, not an absent-value model. |
+| [AWS Secrets Manager `GetSecretValue`](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html) | A secret response includes version and staging information. An adapter can retain the actual version alongside an injected payload without making every consumer depend on the SDK response shape. |
 
-### Limits and non-goals
+### Where it fits with DI Bag
 
-- If you own the value's type, put the metadata on the object.
-- If absence is rare and metadata is not needed, `T | undefined` with an
-  `Object.hasOwn` check is enough. Angular and Vue resolve missing
-  dependencies with sentinels or `undefined`
-  ([`Injector.get`](https://angular.dev/api/core/Injector),
-  [`inject`](https://vuejs.org/api/composition-api-dependency-injection.html)),
-  and that is adequate for most resolution APIs.
-- This package is not an `Option` algebra. There is no `map` or `flatMap`.
-  Use Effect or fp-ts when you need one.
-- No DI container was found that carries per-value metadata from provider to
-  consumer. The precedent for the metadata channel is configuration
-  provenance tooling, so the channel earns its place for provenance,
-  freshness, and reasons, not as a general-purpose side channel.
-- The nine presence classes have no precedent. Every verified source encodes
-  presence with one composable primitive. They remain for compatibility.
-  New code should construct `ValBox.Unknown`, refine with `convert` when a
-  static guarantee is needed, and hand out `snapshot()` results.
-  `Presence<T>` and `ValBoxSnapshot<V, M>` are the contracts other
-  libraries consume.
-- `alias` is a free string. Spring's `Origin` records file, line, and
-  column. Put structured provenance in the metadata channel and use the
-  alias only as a label.
+1. **Configuration or secret provenance discovered during acquisition.** A
+   provider may try environment, file, and remote sources. Registration metadata
+   can describe those candidates, but only the acquisition knows which answered
+   and which version was read. `ValBoxFrame` connects that information to the
+   acquired value without adding fields to a primitive or third-party object.
+2. **An optional result with a reason.** A registered factory may find no
+   tenant override or deliberately omit a feature-gated service. Presence mode
+   carries that absence to consumers and retains the explanation for observers.
+   This differs from a missing registration, which DI Bag's optional dependencies
+   already handle. Disabled `false` is still a present flag value.
+3. **A snapshot with freshness information.** A provider can expose a payload
+   and record an ETag, version, or retrieval time. This describes the acquired
+   snapshot; refresh and invalidation need an application policy. For live flags
+   or caches, injecting their client is often simpler than caching one result
+   in a bag.
 
-### Use with DI Bag
-
-[DI Bag](https://github.com/dany-fedorov/di-bag) ships structural adapters,
-`fromValBox` and `fromValBoxAsync`, on its `di-bag/val-box` entry. They do not
-import this package; any object with a compatible `snapshot()` method works.
-The adapter calls `snapshot()` once per acquisition, hands the value to
-consumers, and records the metadata channel and alias as a frozen
-`ValBoxFrame` that `bag.inspect(key)` and lifecycle observers can read without
-resolving the service:
+For example, this loader distinguishes a missing key from an explicitly
+supplied `undefined` and records which lookup produced the result:
 
 ```ts
 import { DiBag } from 'di-bag/node';
 import { fromValBox } from 'di-bag/val-box';
 import { ValBox } from 'val-box';
 
-const databaseUrl = fromValBox(() =>
-  new ValBox.WithValue.WithMetadata(
-    process.env.DATABASE_URL ?? 'postgres://localhost/app',
-    { source: process.env.DATABASE_URL ? 'env' : 'default' },
-    'database-url',
-  ),
-);
-const betaFlag = fromValBox(
-  () => new ValBox.Unknown<boolean, { reason: string }>('beta').setMetadata({ reason: 'disabled' }),
-  { value: 'presence' },
-);
+type Origin = { source: string; key: string; reason: 'found' | 'missing' };
+const overrides = new Map<string, number | undefined>([['timeoutMs', undefined]]);
 
-const bag = DiBag.begin().add({ databaseUrl, betaFlag }).end();
-bag.resolve('databaseUrl'); // string
-bag.resolve('betaFlag'); // { present: false }
-bag.inspect('databaseUrl').acquisitions[0]?.metadata[0];
-// { present: true, value: { kind: 'val-box', metadata: { present: true, value: { source: 'env' } }, alias: 'database-url' } }
+function lookup(key: string) {
+  const found = overrides.has(key);
+  const box = new ValBox.Unknown<number | undefined, Origin>(key)
+    .setMetadata({ source: 'tenant-overrides', key, reason: found ? 'found' : 'missing' });
+  if (found) box.setValue(overrides.get(key));
+  return box;
+}
+
+const bag = DiBag.begin().add({
+  timeout: fromValBox(() => lookup('timeoutMs'), { value: 'presence' }),
+  retries: fromValBox(() => lookup('retries'), { value: 'presence' }),
+}).end();
+
+bag.inspect('timeout').acquisitions; // []: inspection does not call lookup
+bag.resolve('timeout'); // { present: true, value: undefined }
+bag.resolve('retries'); // { present: false }
+
+const frame = bag.inspect('retries').acquisitions[0]?.metadata[0];
+if (frame?.present && frame.value.metadata.present) {
+  console.log(frame.value.metadata.value.reason); // 'missing'
+}
 await bag.close();
 ```
 
-Required mode throws when the value is absent; `{ value: 'presence' }` exposes
-`Presence<T>` instead. Ownership stays explicit: wrapping the raw box in
-`DiBag.withDisposal` owns the box, not the payload. See the
-[DI Bag box adapter reference](https://github.com/dany-fedorov/di-bag/blob/main/docs/guides/api-reference.md#optional-box-adapters).
+The distinction lets a consumer apply a fallback only on absence, while treating
+present `undefined` according to its domain contract. A plain `Map.has` check
+already solves this locally; the box carries the distinction and provenance
+across an adapter boundary.
+
+`fromValBox` snapshots an immediate box once per acquisition. Default required
+mode exposes its value and throws on absence; `{ value: 'presence' }` exposes
+`Presence<T>`. `fromValBoxAsync` handles a Promise of a box; required mode also
+awaits a Promise-valued payload, while presence mode preserves the payload
+inside the presence record.
+
+Both adapters append a `ValBoxFrame` containing metadata presence and alias.
+`inspect()` never triggers acquisition: frames become available only after the
+adapter has obtained a snapshot. Inspection is a point-in-time view, not an
+append-only audit log; close clears acquisitions and failed attempts are not
+retained as history. Static owner/team labels belong in `DiBag.withMetadata`,
+which is inspectable before resolution without a box. See the
+[metadata guide](https://github.com/dany-fedorov/di-bag/blob/main/docs/guides/tutorial.md#attach-metadata-and-inspect-without-resolving).
+
+### What is simpler, and what may be over-engineered
+
+- **Presence alone:** use `T | undefined` if `undefined` always means absent.
+  If it is a legitimate payload, use a discriminated union, `Map.has`, an own
+  property check, or `Option<T>`. For example, [fp-ts](https://gcanti.github.io/fp-ts/modules/Option.ts.html)
+  can represent `some(undefined)`; its `fromNullable(undefined)` deliberately
+  produces `none`. Preserving present `undefined` is not unique to val-box.
+- **A value plus metadata:** an ordinary `{ value, metadata }` record is enough
+  when both are required. Two `Presence` fields are enough when both are
+  optional. If all consumers need the metadata, inject that record directly;
+  separating it into inspection frames may add indirection without benefit.
+- **Registration metadata:** ownership tags, service descriptions, and known
+  configuration sources already fit DI Bag's `withMetadata`. val-box adds value
+  when the metadata describes the particular result produced at runtime.
+- **Nine presence classes:** their static guarantees restrict allowed mutations,
+  but the sourced production cases do not establish a need for a 3 × 3 class
+  hierarchy. Unknown presence is uncertainty in the type, not a third runtime
+  state. The hierarchy and conversion API are the most plausible
+  over-engineering here. New integrations can consume the small
+  `Presence<T>` / `ValBoxSnapshot<V, M>` protocol; the classes need no role in
+  their public API.
+- **Snapshot guarantees:** the outer records are frozen, but payload objects
+  remain shared and mutable. This is not deep immutability, isolation, automatic
+  redaction, or tamper-proof audit storage. Select metadata appropriate for
+  inspection; a secret's version identifier and its secret contents have
+  different disclosure requirements.
+
+DI Bag's adapters are structural: any compatible `snapshot()` object works,
+without installing `val-box`. They preserve existing ownership and acquire none
+implicitly. Wrapping the box factory in `withDisposal` owns the box; wrapping
+the adapted provider owns that stage’s acquired value (the fulfilled payload
+for normal Promise acquisition). See the
+[box adapter guide](https://github.com/dany-fedorov/di-bag/blob/main/docs/guides/tutorial.md#optional-box-adapters).
+
+**Assessment:** presence plus per-acquisition provenance is worth having when
+services should receive plain values and diagnostics need their origins. That
+supports the small snapshot protocol more strongly than the full mutable class
+matrix. Use the package if its construction and conversion helpers remove
+repeated work; a plain record is a reasonable default for a single application.
 
 ## Development
 
