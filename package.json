@@ -1,7 +1,7 @@
 {
   "name": "val-box",
   "version": "0.1.1",
-  "description": "Typed value presence and result metadata for modular features, quick evals, and programmable tooling.",
+  "description": "Explicit value and metadata presence, checked conversions, and shallow-frozen snapshots for TypeScript apps and LLM harnesses.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

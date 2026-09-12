@@ -1,6 +1,6 @@
 # val-box
 
-Typed values and programmable metadata for modular, agentic development.
+Explicit value presence and optional metadata for agentic development, LLM harnesses, and agent graphs.
 
 `val-box` gives a module a small result contract: whether a value was supplied,
 the value itself, and independently optional metadata. A feature can consume the
@@ -8,22 +8,29 @@ payload while inspectors and policies use its source, revision, or absence
 reason. Humans and coding agents can implement these consumers separately and
 check them against the same TypeScript contract.
 
-- **[Modularity for context engineering](#modularity-for-context-engineering).**
-  Pass a result contract between modules. A coding agent can change a consumer
-  with a few representative snapshots, without reading the provider's storage
-  or lookup logic.
-- **[TypeScript for quick evals](#typescript-for-quick-evals).**
+- **[Explicit presence at module boundaries](#explicit-presence-at-module-boundaries).**
+  Pass a result contract between modules. A coding agent may use representative
+  snapshots as focused context when they adequately describe the required
+  behavior. Smaller context depends on those contracts and deliberate selection.
+- **[Typed presence checks and fixtures](#typed-presence-checks-and-fixtures).**
   Check payloads, metadata, and presence handling before running the application.
   Use small fixtures to evaluate missing values, explicit overrides, and
-  conversions without setting up external services.
-- **[Metadata for programmable tooling](#metadata-for-programmable-tooling).**
-  Carry structured facts alongside a result. Build inspectors, freshness rules,
+  conversions without setting up external services. These checks test presence
+  handling, not model quality or the correctness of external data.
+- **[Application-defined result metadata](#application-defined-result-metadata).**
+  Carry structured fields alongside a result. Build inspectors, freshness rules,
   and source-selection policies that branch on fields instead of parsing prose
   or adding diagnostic fields to business values.
 
 Use these result contracts [inside an LLM agent harness](#inside-an-llm-agent-harness)
 to keep graph-node outputs inspectable and make routing decisions from structured
 metadata.
+Use it when adapters repeatedly need independent value and metadata presence.
+A plain presence union or required `{ value, metadata }` record may be simpler.
+Presence does not mean success, and metadata does not verify its own provenance.
+
+See [Harness engineering rationale](HARNESS-ENGINEERING.md) for the mechanisms,
+plain TypeScript alternatives, conditions for adoption, and evidence limits.
 
 ## Install
 
@@ -59,7 +66,7 @@ Presence is stored separately from the payload. Present `undefined`, `null`,
 `false`, and `0` are supplied values. Reading an absent channel also returns
 `undefined`, so check presence when that distinction matters.
 
-## Modularity for context engineering
+## Explicit presence at module boundaries
 
 A settings consumer needs a lookup contract and example results. Its provider
 can own file access, environment precedence, or remote configuration privately.
@@ -100,16 +107,17 @@ console.log('Missing, zero, and explicit undefined stay distinct');
 ```
 
 Export `ReadSetting` as the shared contract and keep the provider implementation
-in its own module. A coding agent changing fallback behavior can work from the
-consumer and these three cases. Another can change lookup precedence while
-keeping the same return type. The consumer applies a default only on absence;
-the application decides what a supplied `undefined` means.
+in its own module. When the contract and these cases cover a fallback change,
+a coding agent can use them as focused context. A lookup-precedence change may
+require additional provider details even when the return type stays the same.
+The consumer applies a default only on absence; the application decides what a
+supplied `undefined` means.
 
 Snapshots capture channel presence and references for a handoff. They do not
 choose module boundaries or isolate nested mutable objects. Clone or select
 payload fields when a consumer requires independent data.
 
-## TypeScript for quick evals
+## Typed presence checks and fixtures
 
 A snapshot makes absence explicit in the type. Required conversions expose a
 definite payload, while metadata remains checked against its own contract.
@@ -162,7 +170,7 @@ These checks evaluate declared types. A required conversion still checks presenc
 at runtime and throws if the value is missing. Type checking does not validate
 external data or prove that a fallback policy is correct.
 
-## Metadata for programmable tooling
+## Application-defined result metadata
 
 Metadata can describe a particular result even when no value was found.
 An application can use the same snapshot for payload consumption, inspection,
@@ -352,7 +360,7 @@ Literal flags select precise classes. Widened boolean flags produce a union of
 the possible results. Conversion preserves the intentional alias and copies
 payload references; it does not clone payload objects.
 
-## Immutable snapshots
+## Shallow-frozen snapshots
 
 `box.snapshot()` and `ValBox.snapshot(box)` return
 `ValBoxSnapshot<V, M>`: an `alias: string | null`, a `value: Presence<V>`,
