@@ -2,35 +2,20 @@
 
 Explicit value presence and optional metadata for agentic development, LLM harnesses, and agent graphs.
 
-`val-box` gives a module a small result contract: whether a value was supplied,
-the value itself, and independently optional metadata. A feature can consume the
-payload while inspectors and policies use its source, revision, or absence
-reason. Humans and coding agents can implement these consumers separately and
-check them against the same TypeScript contract.
+Distinguish a missing value from a supplied `undefined`, `false`, or `0`.
+Carry independently optional metadata—such as a source or absence reason—and
+hand results between modules as typed snapshots.
 
 - **[Explicit presence at module boundaries](#explicit-presence-at-module-boundaries).**
-  Pass a result contract between modules. A coding agent may use representative
-  snapshots as focused context when they adequately describe the required
-  behavior. Smaller context depends on those contracts and deliberate selection.
+  Apply defaults on absence without discarding deliberate overrides.
 - **[Typed presence checks and fixtures](#typed-presence-checks-and-fixtures).**
-  Check payloads, metadata, and presence handling before running the application.
-  Use small fixtures to evaluate missing values, explicit overrides, and
-  conversions without setting up external services. These checks test presence
-  handling, not model quality or the correctness of external data.
+  Check presence branches and required conversions with small local fixtures.
 - **[Application-defined result metadata](#application-defined-result-metadata).**
-  Carry structured fields alongside a result. Build inspectors, freshness rules,
-  and source-selection policies that branch on fields instead of parsing prose
-  or adding diagnostic fields to business values.
+  Build source-selection and freshness rules without changing business values.
 
-Use these result contracts [inside an LLM agent harness](#inside-an-llm-agent-harness)
-to keep graph-node outputs inspectable and make routing decisions from structured
-metadata.
-Use it when adapters repeatedly need independent value and metadata presence.
-A plain presence union or required `{ value, metadata }` record may be simpler.
-Presence does not mean success, and metadata does not verify its own provenance.
-
-See [Harness engineering rationale](HARNESS-ENGINEERING.md) for the mechanisms,
-plain TypeScript alternatives, conditions for adoption, and evidence limits.
+Use it for configuration, adapter results, and outputs
+[inside an LLM agent harness](#inside-an-llm-agent-harness).
+For a single presence check, a plain union may be enough.
 
 ## Install
 
@@ -107,9 +92,9 @@ console.log('Missing, zero, and explicit undefined stay distinct');
 ```
 
 Export `ReadSetting` as the shared contract and keep the provider implementation
-in its own module. When the contract and these cases cover a fallback change,
-a coding agent can use them as focused context. A lookup-precedence change may
-require additional provider details even when the return type stays the same.
+in its own module. Keep fallback tests with the consumer and lookup-precedence
+tests with the provider, so humans and coding agents can find the behavior they
+are changing. Check both sides when a change crosses that boundary.
 The consumer applies a default only on absence; the application decides what a
 supplied `undefined` means.
 
