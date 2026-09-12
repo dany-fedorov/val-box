@@ -4,8 +4,16 @@
 classes are mutable, while immutable snapshots provide a safe boundary for
 diagnostics and adapters.
 
+[View `val-box` on npm](https://www.npmjs.com/package/val-box).
+
 See [Why val-box exists](#why-val-box-exists) for the problem it solves,
 production uses, prior art, and its limits.
+
+## Installation
+
+```sh
+npm install val-box
+```
 
 ## Mutable compatibility boxes
 
@@ -127,8 +135,8 @@ the necessity of its class hierarchy. Sources were checked on 2026-09-10.
 1. **Configuration or secret provenance discovered during acquisition.** A
    provider may try environment, file, and remote sources. Registration metadata
    can describe those candidates, but only the acquisition knows which answered
-   and which version was read. `ValBoxFrame` connects that information to the
-   acquired value without adding fields to a primitive or third-party object.
+   and which version was read. `ValBoxSnapshot` keeps that information beside
+   the acquired value without adding fields to a primitive or third-party object.
 2. **An optional result with a reason.** A registered factory may find no
    tenant override or deliberately omit a feature-gated service. Presence mode
    carries that absence to consumers and retains the explanation for observers.
@@ -145,7 +153,6 @@ supplied `undefined` and records which lookup produced the result:
 
 ```ts
 import { DiBag } from 'di-bag/node';
-import { fromValBox } from 'di-bag/val-box';
 import { ValBox } from 'val-box';
 
 type Origin = { source: string; key: string; reason: 'found' | 'missing' };
@@ -159,18 +166,19 @@ function lookup(key: string) {
   return box;
 }
 
-const bag = DiBag.begin().add({
-  timeout: fromValBox(() => lookup('timeoutMs'), { value: 'presence' }),
-  retries: fromValBox(() => lookup('retries'), { value: 'presence' }),
-}).end();
+const bag = DiBag.createBuilder()
+  .register({
+    timeout: () => lookup('timeoutMs').snapshot(),
+    retries: () => lookup('retries').snapshot(),
+  })
+  .build();
 
-bag.inspect('timeout').acquisitions; // []: inspection does not call lookup
-bag.resolve('timeout'); // { present: true, value: undefined }
-bag.resolve('retries'); // { present: false }
+bag.resolve('timeout').value; // { present: true, value: undefined }
+bag.resolve('retries').value; // { present: false }
 
-const frame = bag.inspect('retries').acquisitions[0]?.metadata[0];
-if (frame?.present && frame.value.metadata.present) {
-  console.log(frame.value.metadata.value.reason); // 'missing'
+const retries = bag.resolve('retries');
+if (retries.metadata.present) {
+  console.log(retries.metadata.value.reason); // 'missing'
 }
 await bag.close();
 ```
@@ -178,21 +186,15 @@ await bag.close();
 The distinction lets a consumer apply a fallback only on absence, while treating
 present `undefined` according to its domain contract. A plain `Map.has` check
 already solves this locally; the box carries the distinction and provenance
-across an adapter boundary.
+across the snapshot boundary.
 
-`fromValBox` snapshots an immediate box once per acquisition. Default required
-mode exposes its value and throws on absence; `{ value: 'presence' }` exposes
-`Presence<T>`. `fromValBoxAsync` handles a Promise of a box; required mode also
-awaits a Promise-valued payload, while presence mode preserves the payload
-inside the presence record.
-
-Both adapters append a `ValBoxFrame` containing metadata presence and alias.
-`inspect()` never triggers acquisition: frames become available only after the
-adapter has obtained a snapshot. Inspection is a point-in-time view, not an
-append-only audit log; close clears acquisitions and failed attempts are not
-retained as history. Static owner/team labels belong in `DiBag.withMetadata`,
-which is inspectable before resolution without a box. See the
-[metadata guide](https://github.com/dany-fedorov/di-bag/blob/main/docs/guides/tutorial.md#attach-metadata-and-inspect-without-resolving).
+DI Bag 0.1 does not include a `val-box` adapter. The example registers immutable
+snapshots directly, keeping value presence, metadata presence, and alias
+available to the consumer. A factory can instead return only `.snapshot().value`
+when consumers need presence but not provenance. DI Bag's `inspect()` describes
+the DI registration and its acquisitions; it does not automatically promote
+Val Box metadata into inspection. Attach metadata known at registration time
+with `DiBag.withMetadata`.
 
 ### What is simpler, and what may be over-engineered
 
@@ -204,7 +206,7 @@ which is inspectable before resolution without a box. See the
 - **A value plus metadata:** an ordinary `{ value, metadata }` record is enough
   when both are required. Two `Presence` fields are enough when both are
   optional. If all consumers need the metadata, inject that record directly;
-  separating it into inspection frames may add indirection without benefit.
+  separating it from the service may add indirection without benefit.
 - **Registration metadata:** ownership tags, service descriptions, and known
   configuration sources already fit DI Bag's `withMetadata`. val-box adds value
   when the metadata describes the particular result produced at runtime.
@@ -221,12 +223,9 @@ which is inspectable before resolution without a box. See the
   inspection; a secret's version identifier and its secret contents have
   different disclosure requirements.
 
-DI Bag's adapters are structural: any compatible `snapshot()` object works,
-without installing `val-box`. They preserve existing ownership and acquire none
-implicitly. Wrapping the box factory in `withDisposal` owns the box; wrapping
-the adapted provider owns that stage’s acquired value (the fulfilled payload
-for normal Promise acquisition). See the
-[box adapter guide](https://github.com/dany-fedorov/di-bag/blob/main/docs/guides/tutorial.md#optional-box-adapters).
+The integration is explicit and adds no ownership implicitly. Wrap the
+registration in `DiBag.withDisposal` when the bag should own the acquired
+snapshot or projected value.
 
 **Assessment:** presence plus per-acquisition provenance is worth having when
 services should receive plain values and diagnostics need their origins. That
