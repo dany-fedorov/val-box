@@ -1,17 +1,25 @@
 # val-box
 
-Preserve what an agent input or context lookup supplied, and where it came from.
+Typed values and programmable metadata for modular, agentic development.
 
-`val-box` keeps value presence and metadata presence independent. An agent's
-tool configuration or context lookup can return an explicit `undefined`, a
-missing entry with an explanation, or a value with its source and version.
-The host can apply defaults only on absence and retain provenance when passing
-results between steps.
+`val-box` gives a module a small result contract: whether a value was supplied,
+the value itself, and independently optional metadata. A feature can consume the
+payload while inspectors and policies use its source, revision, or absence
+reason. Humans and coding agents can implement these consumers separately and
+check them against the same TypeScript contract.
 
-- Preserve present `undefined`, `null`, `false`, and `0`.
-- Attach source, freshness, or absence information independently of the value.
-- Build results incrementally, then publish a shallow immutable snapshot.
-- Require or remove channels through conversions with precise TypeScript types.
+- **[Modularity for context engineering](#modularity-for-context-engineering).**
+  Pass a result contract between modules. A coding agent can change a consumer
+  with a few representative snapshots, without reading the provider's storage
+  or lookup logic.
+- **[TypeScript for quick evals](#typescript-for-quick-evals).**
+  Check payloads, metadata, and presence handling before running the application.
+  Use small fixtures to evaluate missing values, explicit overrides, and
+  conversions without setting up external services.
+- **[Metadata for programmable tooling](#metadata-for-programmable-tooling).**
+  Carry structured facts alongside a result. Build inspectors, freshness rules,
+  and source-selection policies that branch on fields instead of parsing prose
+  or adding diagnostic fields to business values.
 
 ## Install
 
@@ -22,72 +30,184 @@ npm install val-box
 Includes TypeScript declarations, CommonJS and ESM import support, and no runtime
 dependencies.
 
-## Quick start: capture a tool setting
+## Quick start: a value with its source
 
 ```ts
 import { ValBox } from 'val-box';
 
 const result = new ValBox.Unknown<number | undefined, string>('timeout')
   .setValue(undefined)
-  .setMetadata('tool configuration');
+  .setMetadata('configuration file');
 
 console.log(result.hasValue()); // true
 console.log(result.getValue()); // undefined, explicitly supplied
-console.log(result.getMetadata()); // 'tool configuration'
+console.log(result.getMetadata()); // 'configuration file'
 
 const snapshot = result.snapshot();
 result.delValue();
 
 console.log(result.hasValue()); // false
 console.log(snapshot.value); // { present: true, value: undefined }
-console.log(snapshot.metadata); // { present: true, value: 'tool configuration' }
+console.log(snapshot.metadata); // { present: true, value: 'configuration file' }
 ```
 
-Presence is stored separately from the payload. Reading an absent channel also
-returns `undefined`, so use a presence check or a snapshot when that distinction
-matters.
+Presence is stored separately from the payload. Present `undefined`, `null`,
+`false`, and `0` are supplied values. Reading an absent channel also returns
+`undefined`, so check presence when that distinction matters.
 
-## Resolve tool configuration with provenance
+## Modularity for context engineering
 
-An agent host may combine per-tool overrides with defaults. This loader preserves
-the difference between a missing override and an explicit `undefined` override.
-Metadata records the source of either result; the host defines what a supplied
-`undefined` means for each setting.
+A settings consumer needs a lookup contract and example results. Its provider
+can own file access, environment precedence, or remote configuration privately.
 
 ```ts
-import { ValBox } from 'val-box';
+import assert from 'node:assert/strict';
+import { ValBox, type ValBoxSnapshot } from 'val-box';
 
-type Origin = { source: string; key: string; reason: 'found' | 'missing' };
-const overrides = new Map<string, number | undefined>([['timeoutMs', undefined]]);
+type Origin = { source: string; reason: 'found' | 'missing' };
+type ReadSetting = (key: string) => ValBoxSnapshot<number | undefined, Origin>;
 
-function lookup(key: string) {
-  const found = overrides.has(key);
-  const result = new ValBox.Unknown<number | undefined, Origin>(key)
-    .setMetadata({
-      source: 'tool-overrides',
-      key,
-      reason: found ? 'found' : 'missing',
-    });
-  if (found) result.setValue(overrides.get(key));
-  return result.snapshot();
+function createSettings(read: ReadSetting) {
+  return {
+    retries(): number | undefined {
+      const result = read('retries');
+      return result.value.present ? result.value.value : 3;
+    },
+  };
 }
 
-const timeout = lookup('timeoutMs');
-const retries = lookup('retries');
+function fixture(values: ReadonlyMap<string, number | undefined>): ReadSetting {
+  return key => {
+    const found = values.has(key);
+    const result = new ValBox.Unknown<number | undefined, Origin>(key)
+      .setMetadata({ source: 'fixture', reason: found ? 'found' : 'missing' });
+    if (found) result.setValue(values.get(key));
+    return result.snapshot();
+  };
+}
 
-console.log(timeout.value); // { present: true, value: undefined }
-console.log(retries.value); // { present: false }
+assert.equal(createSettings(fixture(new Map())).retries(), 3);
+assert.equal(createSettings(fixture(new Map([['retries', 0]]))).retries(), 0);
+assert.equal(
+  createSettings(fixture(new Map([['retries', undefined]]))).retries(),
+  undefined,
+);
+console.log('Missing, zero, and explicit undefined stay distinct');
+```
 
-const effectiveRetries = retries.value.present ? retries.value.value : 3;
-console.log(effectiveRetries); // 3
-if (retries.metadata.present) {
-  console.log(retries.metadata.value.reason); // 'missing'
+Export `ReadSetting` as the shared contract and keep the provider implementation
+in its own module. A coding agent changing fallback behavior can work from the
+consumer and these three cases. Another can change lookup precedence while
+keeping the same return type. The consumer applies a default only on absence;
+the application decides what a supplied `undefined` means.
+
+Snapshots capture channel presence and references for a handoff. They do not
+choose module boundaries or isolate nested mutable objects. Clone or select
+payload fields when a consumer requires independent data.
+
+## TypeScript for quick evals
+
+A snapshot makes absence explicit in the type. Required conversions expose a
+definite payload, while metadata remains checked against its own contract.
+
+```ts
+import assert from 'node:assert/strict';
+import { ValBox } from 'val-box';
+
+type Origin = { source: string };
+const result = new ValBox.Unknown<number, Origin>('retries')
+  .setValue(0)
+  .setMetadata({ source: 'configuration' });
+
+function rejectedContracts() {
+  const snapshot = result.snapshot();
+  // @ts-expect-error Narrow presence before reading the snapshot payload.
+  const unchecked: number = snapshot.value.value;
+  // @ts-expect-error Metadata must satisfy the declared Origin type.
+  result.setMetadata({ source: 42 });
+  // @ts-expect-error Snapshot records are readonly.
+  snapshot.alias = 'changed';
+  return unchecked;
+}
+
+const snapshot = result.snapshot();
+if (snapshot.value.present) {
+  const retries: number = snapshot.value.value;
+  assert.equal(retries, 0);
+}
+const required = result.convert({ hasValue: true, hasMetadata: false });
+const retries: number = required.getValue();
+assert.equal(retries, 0);
+assert.equal(required.hasMetadata(), false);
+console.log('Presence, payload, and metadata contracts passed');
+```
+
+Save each example in its own `example.ts` file. To check it:
+
+```sh
+npm install --save-dev typescript @types/node
+npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module Node16 --moduleResolution Node16 example.ts
+```
+
+Run a checked example with `bun example.ts`, or compile it without
+`--noEmit` and run `node example.js`. Bun execution alone does not type-check.
+
+Keep `rejectedContracts` uncalled. Each `@ts-expect-error` requires an error
+on that line; remove the directive to inspect the compiler's diagnostic.
+These checks evaluate declared types. A required conversion still checks presence
+at runtime and throws if the value is missing. Type checking does not validate
+external data or prove that a fallback policy is correct.
+
+## Metadata for programmable tooling
+
+Metadata can describe a particular result even when no value was found.
+An application can use the same snapshot for payload consumption, inspection,
+and a policy decision without changing the payload's own type.
+
+```ts
+import assert from 'node:assert/strict';
+import { ValBox, type ValBoxSnapshot } from 'val-box';
+
+type Origin = { source: string; revision: string; fresh: boolean };
+type Reading = ValBoxSnapshot<number, Origin>;
+
+function chooseAction(reading: Reading): 'load' | 'refresh' | 'use' {
+  if (!reading.value.present) return 'load';
+  if (!reading.metadata.present || !reading.metadata.value.fresh) return 'refresh';
+  return 'use';
+}
+
+const current = new ValBox.Unknown<number, Origin>('shipping-cents')
+  .setValue(500)
+  .setMetadata({ source: 'pricing-service', revision: 'r7', fresh: true });
+const stale = new ValBox.Unknown<number, Origin>('shipping-cents')
+  .setValue(400)
+  .setMetadata({ source: 'local-cache', revision: 'r6', fresh: false });
+const missing = new ValBox.Unknown<number, Origin>('shipping-cents')
+  .setMetadata({ source: 'local-cache', revision: 'r6', fresh: false });
+
+assert.equal(chooseAction(current.snapshot()), 'use');
+assert.equal(chooseAction(stale.snapshot()), 'refresh');
+assert.equal(chooseAction(missing.snapshot()), 'load');
+
+const reading = current.snapshot();
+if (reading.metadata.present) {
+  const inspection = {
+    alias: reading.alias,
+    source: reading.metadata.value.source,
+    revision: reading.metadata.value.revision,
+    action: chooseAction(reading),
+  };
+  assert.equal(inspection.action, 'use');
+  console.log(inspection);
 }
 ```
 
-Use the same pattern for retrieved context with a document version, cached tool
-results with an ETag, or unavailable evidence with a reason. Metadata describes
-the particular result; it need not be part of the value's own type.
+Here the provider supplies the freshness fact, and `chooseAction` is an
+application policy. Val Box neither computes freshness nor performs the selected
+action. A different consumer can inspect revision history or expose a payload
+without implementing this policy. Validate metadata from external sources before
+letting it influence execution.
 
 ## Mutable boxes
 

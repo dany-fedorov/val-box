@@ -1,7 +1,7 @@
 {
   "name": "val-box",
   "version": "0.1.1",
-  "description": "Preserve agent input presence and result provenance with typed value boxes and immutable snapshots.",
+  "description": "Typed value presence and result metadata for modular features, quick evals, and programmable tooling.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
