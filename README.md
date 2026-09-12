@@ -21,6 +21,10 @@ check them against the same TypeScript contract.
   and source-selection policies that branch on fields instead of parsing prose
   or adding diagnostic fields to business values.
 
+Use these result contracts [inside an LLM agent harness](#inside-an-llm-agent-harness)
+to keep graph-node outputs inspectable and make routing decisions from structured
+metadata.
+
 ## Install
 
 ```sh
@@ -208,6 +212,66 @@ application policy. Val Box neither computes freshness nor performs the selected
 action. A different consumer can inspect revision history or expose a payload
 without implementing this policy. Validate metadata from external sources before
 letting it influence execution.
+
+## Inside an LLM agent harness
+
+An agent harness coordinates a large language model (LLM), tools, and their
+execution environment.
+An agent workflow graph organizes processing into nodes and routing edges.
+`val-box` gives tool and node results an explicit contract: what was supplied,
+where it came from, and metadata the harness can use for inspection and routing.
+
+This example selects the next node from a retrieval result. Missing content
+starts a search; stale content requests a refresh; current content can support
+an answer. A supplied empty list is a completed search with no matches.
+
+```ts
+import assert from 'node:assert/strict';
+import { ValBox, type ValBoxSnapshot } from 'val-box';
+
+type Provenance = { source: string; revision: string; fresh: boolean };
+type Retrieval = ValBoxSnapshot<readonly string[], Provenance>;
+type NextNode = 'search' | 'refresh' | 'answer' | 'no-results';
+
+function nextNode(result: Retrieval): NextNode {
+  if (!result.value.present) return 'search';
+  if (!result.metadata.present || !result.metadata.value.fresh) return 'refresh';
+  return result.value.value.length === 0 ? 'no-results' : 'answer';
+}
+
+const missing = new ValBox.Unknown<readonly string[], Provenance>('retrieval')
+  .setMetadata({ source: 'cache', revision: 'r1', fresh: false });
+const stale = new ValBox.Unknown<readonly string[], Provenance>('retrieval')
+  .setValue(['Refunds are available within 14 days.'])
+  .setMetadata({ source: 'cache', revision: 'r1', fresh: false });
+const current = new ValBox.Unknown<readonly string[], Provenance>('retrieval')
+  .setValue(['Refunds are available within 30 days.'])
+  .setMetadata({ source: 'policy-index', revision: 'r2', fresh: true });
+const noMatches = new ValBox.Unknown<readonly string[], Provenance>('retrieval')
+  .setValue([])
+  .setMetadata({ source: 'policy-index', revision: 'r2', fresh: true });
+
+assert.equal(nextNode(missing.snapshot()), 'search');
+assert.equal(nextNode(stale.snapshot()), 'refresh');
+assert.equal(nextNode(current.snapshot()), 'answer');
+assert.equal(nextNode(noMatches.snapshot()), 'no-results');
+
+const selected = current.snapshot();
+assert.equal(selected.metadata.present && selected.metadata.value.revision, 'r2');
+console.log('Missing, stale, current, and empty retrieval results route explicitly');
+```
+
+`nextNode` is application routing code; the harness executes the selected
+step. Presence, freshness, and empty-result meanings are part of this
+application's contract. The box does not infer success, trust, or execution
+status from a payload.
+
+The routing policy can be evaluated with four small fixtures, independently of
+the retriever, model, or graph runner. Another consumer can inspect provenance
+without knowing the routing rules. Snapshots preserve presence and references
+within the process; validate and encode payloads and metadata before putting
+them into a graph's persisted state. The graph runtime owns checkpointing and
+state-update rules.
 
 ## Mutable boxes
 

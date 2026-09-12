@@ -36,7 +36,12 @@
     "provenance",
     "snapshot",
     "configuration",
-    "agent"
+    "agent",
+    "agentic",
+    "harness",
+    "llm",
+    "graph",
+    "agent-graph"
   ],
   "author": "Dany Fedorov",
   "license": "MIT",
