@@ -1,7 +1,7 @@
 {
   "name": "val-box",
-  "version": "0.1.0",
-  "description": "Mutable value/metadata presence boxes with immutable snapshots.",
+  "version": "0.1.1",
+  "description": "Preserve agent input presence and result provenance with typed value boxes and immutable snapshots.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -11,7 +11,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "bun test",
@@ -29,8 +30,13 @@
     "access": "public"
   },
   "keywords": [
-    "val",
-    "box"
+    "typescript",
+    "presence",
+    "metadata",
+    "provenance",
+    "snapshot",
+    "configuration",
+    "agent"
   ],
   "author": "Dany Fedorov",
   "license": "MIT",

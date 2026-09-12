@@ -1,158 +1,60 @@
-# Val Box
+# val-box
 
-`val-box` tracks value and metadata presence independently. Its compatibility
-classes are mutable, while immutable snapshots provide a safe boundary for
-diagnostics and adapters.
+Preserve what an agent input or context lookup supplied, and where it came from.
 
-[View `val-box` on npm](https://www.npmjs.com/package/val-box).
+`val-box` keeps value presence and metadata presence independent. An agent's
+tool configuration or context lookup can return an explicit `undefined`, a
+missing entry with an explanation, or a value with its source and version.
+The host can apply defaults only on absence and retain provenance when passing
+results between steps.
 
-See [Why val-box exists](#why-val-box-exists) for the problem it solves,
-production uses, prior art, and its limits.
+- Preserve present `undefined`, `null`, `false`, and `0`.
+- Attach source, freshness, or absence information independently of the value.
+- Build results incrementally, then publish a shallow immutable snapshot.
+- Require or remove channels through conversions with precise TypeScript types.
 
-## Installation
+## Install
 
 ```sh
 npm install val-box
 ```
 
-## Mutable compatibility boxes
+Includes TypeScript declarations, CommonJS and ESM import support, and no runtime
+dependencies.
 
-Start with `ValBox.Unknown<V, M>` when either channel may be absent. Presence is
-separate from the payload, so a present `undefined` is not the same as an absent
-channel.
+## Quick start: capture a tool setting
 
 ```ts
 import { ValBox } from 'val-box';
 
-const box = new ValBox.Unknown<number | undefined, string>('provider')
+const result = new ValBox.Unknown<number | undefined, string>('timeout')
   .setValue(undefined)
-  .setMetadata('database');
+  .setMetadata('tool configuration');
 
-box.hasValue();       // true
-box.getValue();       // undefined, but present
-box.hasMetadata();    // true
-box.getMetadata();    // 'database'
+console.log(result.hasValue()); // true
+console.log(result.getValue()); // undefined, explicitly supplied
+console.log(result.getMetadata()); // 'tool configuration'
+
+const snapshot = result.snapshot();
+result.delValue();
+
+console.log(result.hasValue()); // false
+console.log(snapshot.value); // { present: true, value: undefined }
+console.log(snapshot.metadata); // { present: true, value: 'tool configuration' }
 ```
 
-The existing named classes and namespace aliases remain available. Boxes whose
-class guarantees a channel is present do not allow deleting it; boxes whose
-class guarantees a channel is absent do not allow setting it. Unknown-presence
-classes retain the mutable `setValue`, `delValue`, `setMetadata`, and
-`delMetadata` operations.
+Presence is stored separately from the payload. Reading an absent channel also
+returns `undefined`, so use a presence check or a snapshot when that distinction
+matters.
 
-## Conversion
+## Resolve tool configuration with provenance
 
-`convert` always creates a new box. Each option controls one channel:
-
-- `true` requires the channel to be present and preserves its payload.
-- `false` removes the channel from the converted box.
-- an omitted or `undefined` option preserves the current runtime state while
-  returning an unknown static presence for that channel.
-
-The two axes are independent. Literal flags return precise named classes;
-widened booleans return a sound union of their possible outcomes.
+An agent host may combine per-tool overrides with defaults. This loader preserves
+the difference between a missing override and an explicit `undefined` override.
+Metadata records the source of either result; the host defines what a supplied
+`undefined` means for each setting.
 
 ```ts
-const original = new ValBox.Unknown<number, string>('source')
-  .setValue(42)
-  .setMetadata('db');
-
-const valueOnly = original.convert({
-  hasValue: true,
-  hasMetadata: false,
-});
-
-const value: number = valueOnly.getValue();
-valueOnly.hasMetadata(); // false
-original.hasMetadata();  // true: conversion did not mutate the original
-```
-
-Conversions copy channel state and preserve an intentional alias. Payload
-objects remain shared by identity; `val-box` does not clone or take ownership of
-them.
-
-## Immutable snapshots
-
-Use `box.snapshot()` or `ValBox.snapshot(box)` to copy the current presence,
-payload references, and intentional alias into a shallow immutable view.
-
-```ts
-import { ValBox, type ValBoxSnapshot } from 'val-box';
-
-const box = new ValBox.Unknown<number | undefined, string>()
-  .setValue(undefined)
-  .setMetadata('db');
-
-const snapshot: ValBoxSnapshot<number | undefined, string> = box.snapshot();
-box.setValue(42).delMetadata();
-
-snapshot.value;    // { present: true, value: undefined }
-snapshot.metadata; // { present: true, value: 'db' }
-```
-
-The outer snapshot and both presence records are frozen. Payloads are not
-deep-frozen or cloned, and ownership is never transferred. Later box mutation
-cannot change which channels or references the snapshot contains, but mutations
-made through a shared payload object remain observable.
-
-`Presence<T>` is discriminated by `present`, so TypeScript exposes `value` only
-after narrowing:
-
-```ts
-if (snapshot.value.present) {
-  const value: number | undefined = snapshot.value.value;
-}
-```
-
-## Why val-box exists
-
-**The useful pattern is a presence-aware value with acquisition provenance.**
-A configuration reader can return a value plus the source that supplied it, or
-no value plus an explanation. A consumer can receive the plain value while DI
-Bag retains its provenance for inspection. That is a real use case; it does
-not require every service to be boxed.
-
-Two separate questions are preserved: “Was a value supplied?” and “Is anything
-known about this result?” Present `undefined`, `null`, `false`, and `0` are all
-values. An absent value can still have metadata, and a present value can have
-no metadata. The alias labels the result; it is not a DI registration key.
-
-### Production precedents
-
-These sources establish the underlying patterns, not adoption of `val-box` or
-the necessity of its class hierarchy. Sources were checked on 2026-09-10.
-
-| Example | Relevant pattern and difference |
-| --- | --- |
-| [Spring Boot `OriginTrackedValue`](https://docs.spring.io/spring-boot/api/java/org/springframework/boot/origin/OriginTrackedValue.html) | A configuration value with an independently optional origin. This is the closest precedent for provenance beside a value, without modifying the value itself. |
-| [Protobuf explicit field presence](https://protobuf.dev/programming-guides/field_presence/) | The API tracks whether a field was set separately from its default value. This supports the presence distinction; it does not imply a JavaScript box or metadata channel is needed. |
-| [NestJS's `undefined` provider issue](https://github.com/nestjs/nest/issues/2732) and [provider classification](https://github.com/nestjs/nest/blob/master/packages/core/injector/module.ts) | A reported failure involved explicitly supplied `undefined`; current classification checks whether `useValue` is an own property. Presence confusion has caused real DI bugs; a property check was sufficient for Nest's case. |
-| [OpenFeature evaluation details](https://openfeature.dev/specification/types/) | Flag values travel with reasons, variants, and metadata. Its value is required and errors can yield a default, so it supports the metadata pattern, not an absent-value model. |
-| [AWS Secrets Manager `GetSecretValue`](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html) | A secret response includes version and staging information. An adapter can retain the actual version alongside an injected payload without making every consumer depend on the SDK response shape. |
-
-### Where it fits with DI Bag
-
-1. **Configuration or secret provenance discovered during acquisition.** A
-   provider may try environment, file, and remote sources. Registration metadata
-   can describe those candidates, but only the acquisition knows which answered
-   and which version was read. `ValBoxSnapshot` keeps that information beside
-   the acquired value without adding fields to a primitive or third-party object.
-2. **An optional result with a reason.** A registered factory may find no
-   tenant override or deliberately omit a feature-gated service. Presence mode
-   carries that absence to consumers and retains the explanation for observers.
-   This differs from a missing registration, which DI Bag's optional dependencies
-   already handle. Disabled `false` is still a present flag value.
-3. **A snapshot with freshness information.** A provider can expose a payload
-   and record an ETag, version, or retrieval time. This describes the acquired
-   snapshot; refresh and invalidation need an application policy. For live flags
-   or caches, injecting their client is often simpler than caching one result
-   in a bag.
-
-For example, this loader distinguishes a missing key from an explicitly
-supplied `undefined` and records which lookup produced the result:
-
-```ts
-import { DiBag } from 'di-bag/node';
 import { ValBox } from 'val-box';
 
 type Origin = { source: string; key: string; reason: 'found' | 'missing' };
@@ -160,88 +62,182 @@ const overrides = new Map<string, number | undefined>([['timeoutMs', undefined]]
 
 function lookup(key: string) {
   const found = overrides.has(key);
-  const box = new ValBox.Unknown<number | undefined, Origin>(key)
-    .setMetadata({ source: 'tenant-overrides', key, reason: found ? 'found' : 'missing' });
-  if (found) box.setValue(overrides.get(key));
-  return box;
+  const result = new ValBox.Unknown<number | undefined, Origin>(key)
+    .setMetadata({
+      source: 'tool-overrides',
+      key,
+      reason: found ? 'found' : 'missing',
+    });
+  if (found) result.setValue(overrides.get(key));
+  return result.snapshot();
 }
 
-const bag = DiBag.createBuilder()
-  .register({
-    timeout: () => lookup('timeoutMs').snapshot(),
-    retries: () => lookup('retries').snapshot(),
-  })
-  .build();
+const timeout = lookup('timeoutMs');
+const retries = lookup('retries');
 
-bag.resolve('timeout').value; // { present: true, value: undefined }
-bag.resolve('retries').value; // { present: false }
+console.log(timeout.value); // { present: true, value: undefined }
+console.log(retries.value); // { present: false }
 
-const retries = bag.resolve('retries');
+const effectiveRetries = retries.value.present ? retries.value.value : 3;
+console.log(effectiveRetries); // 3
 if (retries.metadata.present) {
   console.log(retries.metadata.value.reason); // 'missing'
 }
-await bag.close();
 ```
 
-The distinction lets a consumer apply a fallback only on absence, while treating
-present `undefined` according to its domain contract. A plain `Map.has` check
-already solves this locally; the box carries the distinction and provenance
-across the snapshot boundary.
+Use the same pattern for retrieved context with a document version, cached tool
+results with an ETag, or unavailable evidence with a reason. Metadata describes
+the particular result; it need not be part of the value's own type.
 
-DI Bag 0.1 does not include a `val-box` adapter. The example registers immutable
-snapshots directly, keeping value presence, metadata presence, and alias
-available to the consumer. A factory can instead return only `.snapshot().value`
-when consumers need presence but not provenance. DI Bag's `inspect()` describes
-the DI registration and its acquisitions; it does not automatically promote
-Val Box metadata into inspection. Attach metadata known at registration time
-with `DiBag.withMetadata`.
+## Mutable boxes
 
-### What is simpler, and what may be over-engineered
+`new ValBox.Unknown<V, M>(alias?)` starts with both channels absent and allows
+each to be set or deleted independently. Mutators return the same box.
 
-- **Presence alone:** use `T | undefined` if `undefined` always means absent.
-  If it is a legitimate payload, use a discriminated union, `Map.has`, an own
-  property check, or `Option<T>`. For example, [fp-ts](https://gcanti.github.io/fp-ts/modules/Option.ts.html)
-  can represent `some(undefined)`; its `fromNullable(undefined)` deliberately
-  produces `none`. Preserving present `undefined` is not unique to val-box.
-- **A value plus metadata:** an ordinary `{ value, metadata }` record is enough
-  when both are required. Two `Presence` fields are enough when both are
-  optional. If all consumers need the metadata, inject that record directly;
-  separating it from the service may add indirection without benefit.
-- **Registration metadata:** ownership tags, service descriptions, and known
-  configuration sources already fit DI Bag's `withMetadata`. val-box adds value
-  when the metadata describes the particular result produced at runtime.
-- **Nine presence classes:** their static guarantees restrict allowed mutations,
-  but the sourced production cases do not establish a need for a 3 × 3 class
-  hierarchy. Unknown presence is uncertainty in the type, not a third runtime
-  state. The hierarchy and conversion API are the most plausible
-  over-engineering here. New integrations can consume the small
-  `Presence<T>` / `ValBoxSnapshot<V, M>` protocol; the classes need no role in
-  their public API.
-- **Snapshot guarantees:** the outer records are frozen, but payload objects
-  remain shared and mutable. This is not deep immutability, isolation, automatic
-  redaction, or tamper-proof audit storage. Select metadata appropriate for
-  inspection; a secret's version identifier and its secret contents have
-  different disclosure requirements.
+| Member | Behavior |
+| --- | --- |
+| `setValue(value)`, `setMetadata(metadata)` | Store a payload and mark that channel present |
+| `delValue()`, `delMetadata()` | Remove a channel |
+| `hasValue()`, `hasMetadata()` | Return the channel's presence |
+| `getValue()`, `getMetadata()` | Return the payload, or `undefined` when absent |
+| `assertHasValue()`, `assertHasMetadata()` | Throw `ValBox.AssertionError` if absent; otherwise return this box |
+| `assertHasNoValue()`, `assertHasNoMetadata()` | Throw `ValBox.AssertionError` if present; otherwise return this box |
+| `getIntentionalAlias()` | Return the supplied label or `null` |
+| `snapshot()` | Capture both channels and the intentional alias |
+| `convert(options)` | Create a separate box with selected presence guarantees |
 
-The integration is explicit and adds no ownership implicitly. Wrap the
-registration in `DiBag.withDisposal` when the bag should own the acquired
-snapshot or projected value.
+Assertions check runtime state; use a snapshot's `present` discriminator or
+`convert({ hasValue: true })` to obtain a statically narrowed payload.
 
-**Assessment:** presence plus per-acquisition provenance is worth having when
-services should receive plain values and diagnostics need their origins. That
-supports the small snapshot protocol more strongly than the full mutable class
-matrix. Use the package if its construction and conversion helpers remove
-repeated work; a plain record is a reasonable default for a single application.
+### Require a channel in the type
 
-## Development
+Construct a box with known presence when that is part of an interface.
+Both type parameters are ordered `<Value, Metadata>` when both are needed.
 
-The package uses Node.js 24.20, npm 11.19, Bun 1.4, and TypeScript 5.9.3 for the
-release verification baseline.
+| Constructor | Arguments | Value | Metadata |
+| --- | --- | --- | --- |
+| `ValBox.Unknown<V, M>` | `alias?` | Mutable presence | Mutable presence |
+| `ValBox.WithValue<V, M>` | `value, alias?` | Required | Mutable presence |
+| `ValBox.WithMetadata<V, M>` | `metadata, alias?` | Mutable presence | Required |
+| `ValBox.WithValue.WithMetadata<V, M>` | `value, metadata, alias?` | Required | Required |
+| `ValBox.NoValue<M>` | `alias?` | Absent | Mutable presence |
+| `ValBox.NoMetadata<V>` | `alias?` | Mutable presence | Absent |
+| `ValBox.WithValue.NoMetadata<V>` | `value, alias?` | Required | Absent |
+| `ValBox.NoValue.WithMetadata<M>` | `metadata, alias?` | Absent | Required |
+| `ValBox.NoValue.NoMetadata` | `alias (or undefined)` | Absent | Absent |
+
+A required channel can be replaced but cannot be deleted. An absent channel
+cannot be set. Disallowed operations throw `ValBox.MethodNotAllowedError`.
+Unknown presence is a static allowance for either runtime state.
+
+The namespace also groups constructors by either axis, such as
+`ValBox.UnknownValue.WithMetadata` and `ValBox.UnknownMetadata.WithValue`.
+The named exports use the full combination, such as
+`ValBoxUnknownValueUnknownMetadata` and `ValBoxWithValueWithMetadata`.
+
+`ValBox.isValBox(value)` checks for an instance from the loaded package copy.
+It is not a validator for remote JSON or instances from another installed copy.
+
+## Conversion
+
+`convert` always creates a new box. Its two options, `hasValue` and
+`hasMetadata`, work independently:
+
+| Option | Result |
+| --- | --- |
+| `true` | Require presence and preserve the payload; throw if absent |
+| `false` | Remove the channel from the new box |
+| Omitted or `undefined` | Preserve runtime presence, with unknown static presence |
+
+```ts
+import { ValBox } from 'val-box';
+
+const original = new ValBox.Unknown<number, string>('source')
+  .setValue(42)
+  .setMetadata('database');
+
+const valueOnly = original.convert({ hasValue: true, hasMetadata: false });
+const value: number = valueOnly.getValue();
+
+console.log(value); // 42
+console.log(valueOnly.hasMetadata()); // false
+console.log(original.hasMetadata()); // true
+```
+
+Literal flags select precise classes. Widened boolean flags produce a union of
+the possible results. Conversion preserves the intentional alias and copies
+payload references; it does not clone payload objects.
+
+## Immutable snapshots
+
+`box.snapshot()` and `ValBox.snapshot(box)` return
+`ValBoxSnapshot<V, M>`: an `alias: string | null`, a `value: Presence<V>`,
+and a `metadata: Presence<M>`. The exported `Presence<T>` type is
+`{ readonly present: false } | { readonly present: true; readonly value: T }`.
+
+```ts
+import { ValBox, type ValBoxSnapshot } from 'val-box';
+
+const box = new ValBox.Unknown<number | undefined, string>()
+  .setValue(undefined)
+  .setMetadata('database');
+const snapshot: ValBoxSnapshot<number | undefined, string> = ValBox.snapshot(box);
+box.setValue(42).delMetadata();
+
+if (snapshot.value.present) {
+  const value: number | undefined = snapshot.value.value;
+  console.log(value); // undefined
+}
+console.log(snapshot.metadata); // { present: true, value: 'database' }
+```
+
+The outer object and both presence records are frozen. Later box mutations
+cannot change the snapshot's presence or references. Payload objects remain
+shared: changing a nested payload is visible through every reference to it.
+
+## Scope and composition
+
+### Agent integration contract
+
+| State | Interpretation |
+| --- | --- |
+| Value present, metadata present | A supplied payload with context about that result |
+| Value present, metadata absent | A supplied payload without provenance |
+| Value absent, metadata present | No payload, with an explanation or source information |
+| Value absent, metadata absent | No payload or metadata supplied |
+
+Check `present` before reading or defaulting a value. Capture a snapshot before
+passing a result to another step; select or clone nested payloads when that step
+needs isolation. Validate and encode snapshots before transport.
+
+Presence does not mean success, truth, confidence, or permission to act. Metadata
+can contain untrusted tool or document content. The host decides which sources
+to trust and which facts may enter the agent's context.
+
+Boxes do not validate payload schemas, redact secrets, transfer ownership,
+refresh caches, or provide deep immutability. Select metadata appropriate for
+the consumer before publishing a snapshot. JSON serialization does not preserve
+every JavaScript payload, including present `undefined`; use an application
+codec if snapshots need to cross a JSON boundary.
+
+Use `T | undefined` when undefined always means absent. Use a plain
+`{ value, metadata }` record when both fields are always required. A box is
+useful when independent presence must travel with a result and callers benefit
+from consistent mutation, conversion, and snapshot operations.
+
+A dependency container such as [DI Bag](https://www.npmjs.com/package/di-bag)
+can register a factory returning a snapshot or a selected payload. Metadata
+stays on that result; container inspection and resource disposal are separate
+policies.
+
+## Validate a change
+
+With Node.js, npm, and Bun installed:
 
 ```sh
-npm install
+npm ci
 npm run check
 npm pack --dry-run
 ```
 
-See [PUBLISHING.md](./PUBLISHING.md) for the explicit local release procedure.
+[Release notes](CHANGELOG.md) · [npm package](https://www.npmjs.com/package/val-box)
